@@ -144,79 +144,111 @@ def patch_send_messages_helper():
 
 
 # ----------------------------------------------------------------------------- 4. entry in Telegram settings
+SETTINGS_FILES = ["SettingsActivity.java", "ProfileActivity.java"]
+SETTINGS_ANCHORS = ["accountRow", "chatRow", "privacyRow", "notificationRow", "dataRow",
+                    "foldersRow", "devicesRow", "powerUsageRow", "languageRow"]
+MENU_ID = 9777
+
+
+def _settings_rows(txt):
+    """Способ A: строка fluxRow в списке настроек."""
+    found = []
+    for a in SETTINGS_ANCHORS:
+        m = re.search(rf"\b{a}\s*=\s*rowCount\+\+\s*;", txt)
+        if m:
+            found.append((m.start(), a))
+    if not found:
+        return None, "A: нет строк-якорей"
+    anchor = sorted(found)[0][1]
+    cm = re.search(r"public\s+class\s+\w+\s+extends\s+[^{]*\{", txt)
+    if not cm:
+        return None, "A: нет объявления класса"
+    out = txt[:cm.end()] + "\n    private int fluxRow = -1;" + txt[cm.end():]
+    out, n = re.subn(rf"(\n[ \t]*)({anchor}\s*=\s*rowCount\+\+\s*;)", r"\1fluxRow = rowCount++;\1\2", out, count=1)
+    if not n:
+        return None, "A: не вставилась fluxRow"
+    out = re.sub(rf"(\n[ \t]*){anchor}\s*=\s*-1\s*;", rf"\1fluxRow = -1;\1{anchor} = -1;", out, count=1)
+    out = re.sub(rf"(\w+)\s*==\s*{anchor}\s*\|\|", rf"\1 == fluxRow || \1 == {anchor} ||", out)
+
+    pat = re.compile(rf"if\s*\(\s*position\s*==\s*{anchor}\s*\)\s*\{{")
+    click = bind = 0
+    res = out
+    for m in reversed(list(pat.finditer(out))):
+        tail = out[m.end(): m.end() + 500]
+        vm = re.search(r"(\w+)\.setTextAndIcon\(", tail)
+        i_icon = vm.start() if vm else 10 ** 9
+        i_pres = tail.find("presentFragment(")
+        i_pres = i_pres if i_pres >= 0 else 10 ** 9
+        if i_pres < i_icon:
+            piece = ("if (position == fluxRow) { presentFragment(new FluxGramSettingsActivity()); } "
+                     f"else if (position == {anchor}) {{")
+            click += 1
+        elif vm:
+            piece = (f"if (position == fluxRow) {{ {vm.group(1)}.setTextAndIcon(\"FluxGram\", "
+                     f"R.drawable.flux_ghost, true); }} else if (position == {anchor}) {{")
+            bind += 1
+        else:
+            continue
+        res = res[:m.start()] + piece + res[m.end():]
+    if click == 0 or bind == 0:
+        return None, f"A: якорь {anchor}, но клик={click}, отрисовка={bind}"
+    return res, f"строка в списке перед {anchor}"
+
+
+def _settings_menu(txt):
+    """Способ B: пункт «FluxGram» в меню ⋮ экрана настроек."""
+    m = re.search(r"(?m)^([ \t]*)(\w+)\.addSubItem\(\s*\w+\s*,", txt)
+    if not m:
+        return None, "B: нет addSubItem"
+    before = txt[:m.start()].rstrip()
+    if not before or before[-1] not in ";{}":
+        return None, "B: addSubItem без скобок после if/else, вставлять небезопасно"
+    k = re.search(r"onItemClick\(\s*(?:final\s+)?int\s+(\w+)\s*\)\s*\{", txt)
+    if not k:
+        return None, "B: нет onItemClick(int id)"
+    ind, var, idv = m.group(1), m.group(2), k.group(1)
+    out = txt[:m.start()] + f'{ind}{var}.addSubItem({MENU_ID}, R.drawable.flux_ghost, "FluxGram");\n' + txt[m.start():]
+    k = re.search(r"onItemClick\(\s*(?:final\s+)?int\s+(\w+)\s*\)\s*\{", out)
+    out = (out[:k.end()]
+           + f"\n                if ({idv} == {MENU_ID}) {{ presentFragment(new FluxGramSettingsActivity()); return; }}"
+           + out[k.end():])
+    return out, "пункт в меню ⋮"
+
+
+def _settings_diagnostics(path, txt):
+    print("------ ДИАГНОСТИКА: пришлите этот вывод ------")
+    print("файл:", path)
+    for i, l in enumerate(txt.splitlines(), 1):
+        if re.search(r"Row\s*=\s*rowCount\+\+|addSubItem\(|UItem\.as|setTextAndIcon|PowerUsage|LanguageSettings|onItemClick", l):
+            print(f"{i}: {l.strip()[:160]}")
+    print("----------------------------------------------")
+
+
 def patch_settings_entry():
-    done = False
-    for name in ("ProfileActivity.java", "SettingsActivity.java"):
+    name_ = "Пункт FluxGram в настройках"
+    for name in SETTINGS_FILES:
         path = f"{JAVA}/org/telegram/ui/{name}"
         if not os.path.exists(path):
             continue
         txt = read(path)
-        if "fluxRow" in txt:
-            report(f"Пункт FluxGram в {name}", True, False, "(уже применён)")
-            done = True
-            break
-        if not re.search(r"\bnotificationRow\b", txt):
-            continue
+        if "FluxGramSettingsActivity" in txt:
+            report(name_, True, False, f"({name}: уже применён)")
+            return
+        notes = []
+        for fn in (_settings_rows, _settings_menu):
+            new, note = fn(txt)
+            if new:
+                write(path, new)
+                report(name_, True, False, f"({name}: {note})")
+                return
+            notes.append(note)
+        report(name_, False, False, f"({name}: " + "; ".join(notes) + ")")
+        _settings_diagnostics(path, txt)
+    # файла настроек нет / ничего не подошло: пункт в боковом меню (запасной вариант)
+    patch_drawer_entry()
 
-        # a) поле fluxRow
-        cm = re.search(r"(public\s+class\s+\w+\s+extends\s+[^{]*\{)", txt)
-        if not cm:
-            continue
-        txt = txt[:cm.end()] + "\n    private int fluxRow = -1;" + txt[cm.end():]
 
-        # b) выдача номера строки + сброс
-        if "notificationRow = rowCount++;" not in txt:
-            report(f"Пункт FluxGram в {name}", False, False, "(нет 'notificationRow = rowCount++;')")
-            continue
-        txt = txt.replace("notificationRow = rowCount++;",
-                          "fluxRow = rowCount++;\n            notificationRow = rowCount++;", 1)
-        txt = re.sub(r"(\n[ \t]*)notificationRow\s*=\s*-1;", r"\1fluxRow = -1;\1notificationRow = -1;", txt, count=1)
-
-        # c) тип строки / enabled: добавляем fluxRow во все цепочки "x == notificationRow ||"
-        txt = re.sub(r"(\w+)\s*==\s*notificationRow\s*\|\|", r"\1 == fluxRow || \1 == notificationRow ||", txt)
-
-        # d) клик и отрисовка
-        found = {"click": 0, "bind": 0}
-
-        def repl(m):
-            tail = txt_after(m.end())
-            i_icon = tail.find("setTextAndIcon(")
-            i_pres = tail.find("presentFragment(")
-            icon = i_icon if i_icon >= 0 else 10 ** 9
-            pres = i_pres if i_pres >= 0 else 10 ** 9
-            if icon < pres:
-                vm = re.search(r"(\w+)\.setTextAndIcon\(", tail)
-                var = vm.group(1) if vm else "textCell"
-                found["bind"] += 1
-                return (f"if (position == fluxRow) {{ {var}.setTextAndIcon(\"FluxGram\", R.drawable.flux_ghost, true); }} "
-                        f"else if (position == notificationRow) {{")
-            if pres < icon:
-                found["click"] += 1
-                return ("if (position == fluxRow) { presentFragment(new FluxGramSettingsActivity()); } "
-                        "else if (position == notificationRow) {")
-            return m.group(0)
-
-        def txt_after(idx):
-            return txt[idx: idx + 400]
-
-        pat = re.compile(r"if\s*\(\s*position\s*==\s*notificationRow\s*\)\s*\{")
-        # правим с конца, чтобы не сбить индексы
-        out = txt
-        for m in reversed(list(pat.finditer(txt))):
-            new_piece = repl(m)
-            out = out[:m.start()] + new_piece + out[m.end():]
-        txt = out
-        write(path, txt)
-        ok = found["click"] >= 1 and found["bind"] >= 1
-        report(f"Пункт FluxGram в {name}", ok, False,
-               f"(клик: {found['click']}, отрисовка: {found['bind']})")
-        done = ok
-        break
-
-    if done:
-        return
-
-    # fallback: пункт в боковом меню (drawer)
+def patch_drawer_entry():
     ok1 = ok2 = False
     p1 = f"{JAVA}/org/telegram/ui/Adapters/DrawerLayoutAdapter.java"
     p2 = f"{JAVA}/org/telegram/ui/LaunchActivity.java"
@@ -237,9 +269,8 @@ def patch_settings_entry():
                  + t[m.end():])
             write(p2, t)
             ok2 = True
-    report("Пункт FluxGram в боковом меню (запасной вариант)", ok1 and ok2, True,
-           "(в настройках якорь не найден, добавлено в боковое меню)" if ok1 and ok2 else
-           "(не удалось добавить ни в настройки, ни в боковое меню)")
+    report("Пункт FluxGram в боковом меню (запасной вариант)", ok1 and ok2, False,
+           "(добавлено)" if ok1 and ok2 else "(не добавлено; сборка продолжится)")
 
 
 # ----------------------------------------------------------------------------- 5. language pack rename
