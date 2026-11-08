@@ -10,13 +10,11 @@ jobs:
     name: Build FluxGram APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      APP_NAME: FluxGram
     permissions:
       contents: write
 
     steps:
-      - name: Checkout Nawmagram overlay
+      - name: Checkout FluxGram overlay
         uses: actions/checkout@v4
         with:
           path: overlay
@@ -27,7 +25,7 @@ jobs:
             https://github.com/DrKLO/Telegram.git telegram
           echo "Telegram cloned: $(git -C telegram log --oneline -1)"
 
-      - name: Apply Nawmagram patches
+      - name: Apply FluxGram patches
         run: |
           cp overlay/overlay/res/values/colors.xml \
             telegram/TMessagesProj/src/main/res/values/colors.xml
@@ -43,43 +41,38 @@ jobs:
              telegram/TMessagesProj/src/main/java/org/telegram/messenger/fork/theme/
 
           # App name
-          sed -i 's|<string name="AppName">Telegram</string>|<string name="AppName">Nawmagram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|<string name="AppNameBeta">Telegram Beta</string>|<string name="AppNameBeta">Nawmagram Beta</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="AppName">Telegram</string>|<string name="AppName">FluxGram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="AppNameBeta">Telegram Beta</string>|<string name="AppNameBeta">FluxGram Beta</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
           # Intro screen
-          sed -i 's|<string name="Page1Title">Telegram</string>|<string name="Page1Title">Nawmagram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="Page1Title">Telegram</string>|<string name="Page1Title">FluxGram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
           # Notifications
-          sed -i 's|<string name="NotificationHiddenName">Telegram</string>|<string name="NotificationHiddenName">Nawmagram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|<string name="NotificationHiddenChatName">Telegram</string>|<string name="NotificationHiddenChatName">Nawmagram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="NotificationHiddenName">Telegram</string>|<string name="NotificationHiddenName">FluxGram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="NotificationHiddenChatName">Telegram</string>|<string name="NotificationHiddenChatName">FluxGram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
           # Secret chat & lock
-          sed -i 's|<string name="SecretChatName">Telegram</string>|<string name="SecretChatName">Nawmagram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|<string name="AppLocked">Telegram Locked</string>|<string name="AppLocked">Nawmagram Locked</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="SecretChatName">Telegram</string>|<string name="SecretChatName">FluxGram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="AppLocked">Telegram Locked</string>|<string name="AppLocked">FluxGram Locked</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
           # Calls
-          sed -i 's|<string name="VoipInCallBranding">Telegram Call</string>|<string name="VoipInCallBranding">Nawmagram Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|<string name="VoipInVideoCallBranding">Telegram Video Call</string>|<string name="VoipInVideoCallBranding">Nawmagram Video Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|<string name="VoipInConferenceCallBranding">Telegram Group Call</string>|<string name="VoipInConferenceCallBranding">Nawmagram Group Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|<string name="CallViaTelegram">Telegram Call</string>|<string name="CallViaTelegram">Nawmagram Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|<string name="VideoCallViaTelegram">Telegram Video Call</string>|<string name="VideoCallViaTelegram">Nawmagram Video Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|<string name="VoiceCallViaTelegram">Telegram Voice Call</string>|<string name="VoiceCallViaTelegram">Nawmagram Voice Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|<string name="VoipInCallBrandingWithName">Telegram Call to %s</string>|<string name="VoipInCallBrandingWithName">Nawmagram Call to %s</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|<string name="VoipInVideoCallBrandingWithName">Telegram Video Call to %s</string>|<string name="VoipInVideoCallBrandingWithName">Nawmagram Video Call to %s</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|Telegram will call you in|Nawmagram will call you in|g' telegram/TMessagesProj/src/main/res/values/strings.xml
-          sed -i 's|Telegram can call you in|Nawmagram can call you in|g' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="VoipInCallBranding">Telegram Call</string>|<string name="VoipInCallBranding">FluxGram Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="VoipInVideoCallBranding">Telegram Video Call</string>|<string name="VoipInVideoCallBranding">FluxGram Video Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="VoipInConferenceCallBranding">Telegram Group Call</string>|<string name="VoipInConferenceCallBranding">FluxGram Group Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="CallViaTelegram">Telegram Call</string>|<string name="CallViaTelegram">FluxGram Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="VideoCallViaTelegram">Telegram Video Call</string>|<string name="VideoCallViaTelegram">FluxGram Video Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="VoiceCallViaTelegram">Telegram Voice Call</string>|<string name="VoiceCallViaTelegram">FluxGram Voice Call</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="VoipInCallBrandingWithName">Telegram Call to %s</string>|<string name="VoipInCallBrandingWithName">FluxGram Call to %s</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="VoipInVideoCallBrandingWithName">Telegram Video Call to %s</string>|<string name="VoipInVideoCallBrandingWithName">FluxGram Video Call to %s</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|Telegram will call you in|FluxGram will call you in|g' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|Telegram can call you in|FluxGram can call you in|g' telegram/TMessagesProj/src/main/res/values/strings.xml
           # Map provider
-          sed -i 's|<string name="MapPreviewProviderTelegram">Telegram</string>|<string name="MapPreviewProviderTelegram">Nawmagram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
+          sed -i 's|<string name="MapPreviewProviderTelegram">Telegram</string>|<string name="MapPreviewProviderTelegram">FluxGram</string>|' telegram/TMessagesProj/src/main/res/values/strings.xml
           echo "All string patches applied"
 
           cp overlay/overlay/gradle.properties telegram/gradle.properties
-          sed -i 's/APP_PACKAGE=org\.telegram\.nawmagram/APP_PACKAGE=org.telegram.messenger/' \
-            telegram/gradle.properties
+          # APP_PACKAGE is set to org.fluxgram.product by apply_fluxgram_features.py
 
           python3 overlay/scripts/patch_google_services.py
           python3 overlay/scripts/apply_all_branding.py telegram
+          python3 overlay/scripts/apply_fluxgram_features.py telegram overlay/overlay
           sed -i 's/abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"/abiFilters "arm64-v8a"/g' telegram/TMessagesProj_App/build.gradle
-          pip install pillow
-          python3 overlay/scripts/apply_icon.py telegram overlay/overlay/icon/icon.png
-          if [ "$APP_NAME" != "Nawmagram" ]; then
-            find telegram/TMessagesProj/src/main/res -name strings.xml -exec sed -i "s|Nawmagram|$APP_NAME|g" {} +
-          fi
           echo "All patches applied"
 
       - name: Write API credentials into BuildVars.java
