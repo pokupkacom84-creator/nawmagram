@@ -1,4 +1,4 @@
-name: Build Nawmagram APK
+name: Build FluxGram APK
 
 on:
   push:
@@ -7,11 +7,11 @@ on:
 
 jobs:
   build:
-    name: Build Nawmagram APK
+    name: Build FluxGram APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      APP_NAME: Nawmagram
+      APP_NAME: FluxGram
     permissions:
       contents: write
 
@@ -116,15 +116,15 @@ jobs:
       - name: Rename APK
         run: |
           APK=$(find telegram/TMessagesProj_App/build/outputs/apk -name "*.apk" | head -1)
-          cp "$APK" Nawmagram-v1.0.apk
-          echo "APK_PATH=Nawmagram-v1.0.apk" >> $GITHUB_ENV
-          echo "APK size: $(du -sh Nawmagram-v1.0.apk | cut -f1)"
+          cp "$APK" FluxGram-v1.0.apk
+          echo "APK_PATH=FluxGram-v1.0.apk" >> $GITHUB_ENV
+          echo "APK size: $(du -sh FluxGram-v1.0.apk | cut -f1)"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Nawmagram-v1.0-build${{ github.run_number }}
-          path: Nawmagram-v1.0.apk
+          name: FluxGram-v1.0-build${{ github.run_number }}
+          path: FluxGram-v1.0.apk
           retention-days: 30
 
       - name: Update GitHub Release v1.0
@@ -151,8 +151,8 @@ jobs:
             https://api.github.com/repos/${{ github.repository }}/releases \
             -d "{
               \"tag_name\": \"v1.0\",
-              \"name\": \"Nawmagram v1.0\",
-              \"body\": \"## Nawmagram v1.0\n\nCustom Telegram Android fork.\n\n### Changes\n- Deep Space dark theme\n- Gradient chat bubbles\n- 3 built-in dark themes\n- Material You support\n\n### Install\nDownload APK below, enable Install from unknown sources, install.\",
+              \"name\": \"FluxGram v1.0\",
+              \"body\": \"## FluxGram v1.0\n\nCustom Telegram Android fork.\n\n### Changes\n- Deep Space dark theme\n- Gradient chat bubbles\n- 3 built-in dark themes\n- Material You support\n\n### Install\nDownload APK below, enable Install from unknown sources, install.\",
               \"draft\": false,
               \"prerelease\": false
             }" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['upload_url'].replace('{?name,label}',''))")
@@ -161,9 +161,9 @@ jobs:
           curl -s -X POST \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Content-Type: application/vnd.android.package-archive" \
-            "$UPLOAD_URL?name=Nawmagram-v1.0.apk" \
-            --data-binary @Nawmagram-v1.0.apk \
+            "$UPLOAD_URL?name=FluxGram-v1.0.apk" \
+            --data-binary @FluxGram-v1.0.apk \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print('Released:', d.get('browser_download_url',''))"
 
-          echo "## Nawmagram v1.0 released!" >> $GITHUB_STEP_SUMMARY
+          echo "## FluxGram v1.0 released!" >> $GITHUB_STEP_SUMMARY
           echo "https://github.com/${{ github.repository }}/releases/tag/v1.0" >> $GITHUB_STEP_SUMMARY
