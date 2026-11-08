@@ -10,6 +10,8 @@ jobs:
     name: Build Nawmagram APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      APP_NAME: Nawmagram
     permissions:
       contents: write
 
@@ -73,6 +75,11 @@ jobs:
           python3 overlay/scripts/patch_google_services.py
           python3 overlay/scripts/apply_all_branding.py telegram
           sed -i 's/abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"/abiFilters "arm64-v8a"/g' telegram/TMessagesProj_App/build.gradle
+          pip install pillow
+          python3 overlay/scripts/apply_icon.py telegram overlay/overlay/icon/icon.png
+          if [ "$APP_NAME" != "Nawmagram" ]; then
+            find telegram/TMessagesProj/src/main/res -name strings.xml -exec sed -i "s|Nawmagram|$APP_NAME|g" {} +
+          fi
           echo "All patches applied"
 
       - name: Write API credentials into BuildVars.java
