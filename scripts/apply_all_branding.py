@@ -9,7 +9,7 @@ if len(sys.argv) > 1:
 elif os.path.exists("telegram/TMessagesProj"):
     TG_PATH = "telegram"
 else:
-    TG_PATH = "/home/nawmbad/.gemini/antigravity-ide/scratch/telegram-real-fork"
+    TG_PATH = "telegram"
 
 print(f"=== Applying branding to: {TG_PATH} ===")
 
@@ -24,9 +24,9 @@ for sf in strings_files:
     orig_content = content
 
     # AppName & Page1Title
-    content = re.sub(r'(<string name="AppName">)[^<]+(</string>)', r'\g<1>Nawmagram\2', content)
-    content = re.sub(r'(<string name="AppNameBeta">)[^<]+(</string>)', r'\g<1>Nawmagram Beta\2', content)
-    content = re.sub(r'(<string name="Page1Title">)[^<]+(</string>)', r'\g<1>Nawmagram\2', content)
+    content = re.sub(r'(<string name="AppName">)[^<]+(</string>)', r'\g<1>FluxGram\2', content)
+    content = re.sub(r'(<string name="AppNameBeta">)[^<]+(</string>)', r'\g<1>FluxGram Beta\2', content)
+    content = re.sub(r'(<string name="Page1Title">)[^<]+(</string>)', r'\g<1>FluxGram\2', content)
 
     # Specific strings where "Telegram" is mentioned
     keys_to_replace = [
@@ -43,9 +43,9 @@ for sf in strings_files:
             header = m.group(1)
             body = m.group(2)
             tail = m.group(3)
-            body = body.replace("Telegram", "Nawmagram")
-            body = body.replace("телеграм", "Nawmagram")
-            body = body.replace("Телеграм", "Nawmagram")
+            body = body.replace("Telegram", "FluxGram")
+            body = body.replace("телеграм", "FluxGram")
+            body = body.replace("Телеграм", "FluxGram")
             return f"{header}{body}{tail}"
         content = re.sub(pattern, repl, content, flags=re.DOTALL)
 
@@ -55,7 +55,7 @@ for sf in strings_files:
         rel_path = os.path.relpath(sf, TG_PATH)
         print(f"Patched: {rel_path}")
 
-# 2. Patch IntroActivity.java (remove ImageSpan logo that overlays Nawmagram text, keep logoDrawable non-null)
+# 2. Patch IntroActivity.java (remove ImageSpan logo that overlays FluxGram text, keep logoDrawable non-null)
 print("\n=== 2. Patching IntroActivity.java ===")
 intro_path = f"{TG_PATH}/TMessagesProj/src/main/java/org/telegram/ui/IntroActivity.java"
 if os.path.exists(intro_path):
@@ -68,7 +68,7 @@ if os.path.exists(intro_path):
         ssb.setSpan(new ImageSpan(logoDrawable), 0, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         titles[0] = ssb;"""
 
-    replacement_intro = """        // Nawmagram: Initialize logoDrawable so updateColors() doesn't NPE, but display text title
+    replacement_intro = """        // FluxGram: Initialize logoDrawable so updateColors() doesn't NPE, but display text title
         logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo).mutate();
         titles[0] = LocaleController.getString(R.string.Page1Title);"""
 
@@ -107,7 +107,7 @@ if os.path.exists(dialogs_path):
                 ssb.setSpan(new ImageSpan(logoDrawable), 0, ssb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 actionBar.setTitle(ssb, statusDrawable);"""
 
-    replacement_dialogs = """                // Nawmagram: Display text app title instead of Telegram vector logo
+    replacement_dialogs = """                // FluxGram: Display text app title instead of Telegram vector logo
                 logoDrawable = context.getResources().getDrawable(R.drawable.telegram_logo_2).mutate();
                 SpannableStringBuilder ssb = new SpannableStringBuilder(getString(R.string.AppName));
                 actionBar.setTitle(ssb, statusDrawable);"""
@@ -126,7 +126,7 @@ if os.path.exists(stories_path):
         stories_code = f.read()
 
     target_stories = "telegramLogoView.setImageResource(R.drawable.telegram_logo_2);"
-    replacement_stories = "telegramLogoView.setVisibility(View.GONE); // Nawmagram: hide vector logo"
+    replacement_stories = "telegramLogoView.setVisibility(View.GONE); // FluxGram: hide vector logo"
     if target_stories in stories_code:
         stories_code = stories_code.replace(target_stories, replacement_stories)
         with open(stories_path, "w", encoding="utf-8") as f:
