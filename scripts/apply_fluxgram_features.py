@@ -3,7 +3,7 @@
 FluxGram: встраивает в исходники DrKLO/Telegram
   * режим призрака (перехват запросов в ConnectionsManager)
   * экраны настроек FluxGram -> Режим призрака
-  * пункт "FluxGram" в настройках Telegram
+  * кнопка/пункт "FluxGram" в настройках Telegram
   * переименование Telegram -> FluxGram в серверных языковых пакетах
   * пакет приложения org.fluxgram.product
 
@@ -143,7 +143,7 @@ def patch_send_messages_helper():
     report("SendMessagesHelper hook (Использовать отложку)", True, False)
 
 
-# ----------------------------------------------------------------------------- 4. entry in Telegram settings
+# ----------------------------------------------------------------------------- 4. entry in Telegram settings (запасные способы)
 SETTINGS_FILES = ["SettingsActivity.java", "ProfileActivity.java"]
 SETTINGS_ANCHORS = ["accountRow", "chatRow", "privacyRow", "notificationRow", "dataRow",
                     "foldersRow", "devicesRow", "powerUsageRow", "languageRow"]
@@ -219,7 +219,7 @@ def _settings_diagnostics(path, txt):
     print("------ ДИАГНОСТИКА: пришлите этот вывод ------")
     print("файл:", path)
     for i, l in enumerate(txt.splitlines(), 1):
-        if re.search(r"Row\s*=\s*rowCount\+\+|addSubItem\(|UItem\.as|setTextAndIcon|PowerUsage|LanguageSettings|onItemClick", l):
+        if re.search(r"Row\s*=\s*rowCount\+\+|addSubItem\(|UItem\.as|setTextAndIcon|PowerUsage|LanguageSettings|onItemClick|createView", l):
             print(f"{i}: {l.strip()[:160]}")
     print("----------------------------------------------")
 
@@ -244,7 +244,6 @@ def patch_settings_entry():
             notes.append(note)
         report(name_, False, False, f"({name}: " + "; ".join(notes) + ")")
         _settings_diagnostics(path, txt)
-    # файла настроек нет / ничего не подошло: пункт в боковом меню (запасной вариант)
     patch_drawer_entry()
 
 
@@ -271,6 +270,124 @@ def patch_drawer_entry():
             ok2 = True
     report("Пункт FluxGram в боковом меню (запасной вариант)", ok1 and ok2, False,
            "(добавлено)" if ok1 and ok2 else "(не добавлено; сборка продолжится)")
+
+
+# ----------------------------------------------------------------------------- 4b. кнопка FluxGram в шапке настроек (основной способ)
+INJECTOR_JAVA = """package org.telegram.ui;
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.drawable.Drawable;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
+import android.widget.FrameLayout;
+
+import androidx.core.content.ContextCompat;
+
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.R;
+import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.LayoutHelper;
+
+public class FluxSettingsInjector {
+
+    private static final String TAG_VIEW = "flux_settings_button";
+
+    public static void attach(final BaseFragment fragment, View root) {
+        try {
+            if (!(root instanceof FrameLayout)) {
+                return;
+            }
+            FrameLayout frame = (FrameLayout) root;
+            for (int i = 0; i < frame.getChildCount(); i++) {
+                if (TAG_VIEW.equals(frame.getChildAt(i).getTag())) {
+                    return;
+                }
+            }
+            Context context = frame.getContext();
+            final Drawable icon = ContextCompat.getDrawable(context, R.drawable.flux_ghost).mutate();
+            final Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
+            View button = new View(context) {
+                private boolean pressed;
+
+                @Override
+                protected void onDraw(Canvas canvas) {
+                    bg.setColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+                    bg.setAlpha(pressed ? 255 : 235);
+                    float r = getWidth() / 2f;
+                    canvas.drawCircle(r, r, r, bg);
+                    icon.setTint(Theme.getColor(Theme.key_featuredStickers_addButton));
+                    int s = AndroidUtilities.dp(24);
+                    int l = (getWidth() - s) / 2;
+                    int t = (getHeight() - s) / 2;
+                    icon.setBounds(l, t, l + s, t + s);
+                    icon.draw(canvas);
+                }
+
+                @Override
+                public boolean onTouchEvent(MotionEvent e) {
+                    switch (e.getAction()) {
+                        case MotionEvent.ACTION_DOWN:
+                            pressed = true;
+                            invalidate();
+                            return true;
+                        case MotionEvent.ACTION_UP:
+                            pressed = false;
+                            invalidate();
+                            performClick();
+                            return true;
+                        case MotionEvent.ACTION_CANCEL:
+                            pressed = false;
+                            invalidate();
+                            return true;
+                    }
+                    return super.onTouchEvent(e);
+                }
+            };
+            button.setTag(TAG_VIEW);
+            button.setContentDescription("FluxGram");
+            button.setOnClickListener(v -> fragment.presentFragment(new FluxGramSettingsActivity()));
+            FrameLayout.LayoutParams lp = LayoutHelper.createFrame(44, 44, Gravity.TOP | Gravity.LEFT, 58, 0, 0, 0);
+            lp.topMargin = AndroidUtilities.statusBarHeight + AndroidUtilities.dp(15);
+            frame.addView(button, lp);
+            button.bringToFront();
+        } catch (Throwable ignore) {
+        }
+    }
+}
+"""
+
+
+def patch_settings_button():
+    """Хук в createView() экрана настроек: не зависит от структуры списка строк."""
+    name_ = "Кнопка FluxGram в шапке настроек"
+    ui = f"{JAVA}/org/telegram/ui"
+    path = f"{ui}/SettingsActivity.java"
+    if not os.path.exists(path):
+        report(name_, False, False, "(SettingsActivity.java не найден)")
+        return False
+    txt = read(path)
+    if "FluxSettingsInjector" in txt:
+        report(name_, True, False, "(уже применён)")
+        return True
+    m = re.search(r"public\s+View\s+createView\s*\(\s*Context\s+(\w+)\s*\)\s*\{", txt)
+    if not m:
+        report(name_, False, False, "(createView не найден в SettingsActivity.java)")
+        return False
+    ctx = m.group(1)
+    new = (f"public View createView(Context {ctx}) {{\n"
+           f"        View fluxRoot = createViewFluxOrig({ctx});\n"
+           f"        FluxSettingsInjector.attach(this, fluxRoot);\n"
+           f"        return fluxRoot;\n"
+           f"    }}\n\n"
+           f"    private View createViewFluxOrig(Context {ctx}) {{")
+    write(path, txt[:m.start()] + new + txt[m.end():])
+    write(f"{ui}/FluxSettingsInjector.java", INJECTOR_JAVA)
+    report(name_, True, False, "(SettingsActivity.java: хук в createView)")
+    return True
 
 
 # ----------------------------------------------------------------------------- 5. language pack rename
@@ -327,7 +444,8 @@ def main():
     copy_overlay()
     patch_connections_manager()
     patch_send_messages_helper()
-    patch_settings_entry()
+    if not patch_settings_button():
+        patch_settings_entry()
     patch_locale_controller()
     patch_hardcoded_titles()
     failed = [n for n, ok, req in results if not ok and req]
