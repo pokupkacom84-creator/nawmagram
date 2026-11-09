@@ -8,7 +8,6 @@ FluxGram: встраивает в исходники DrKLO/Telegram
   * пакет приложения org.fluxgram.product
 
 Использование: apply_fluxgram_features.py <telegram_dir> <overlay_dir>
-Каждый патч ищет якорь в коде; если якорь не найден - пишет WARN/FAIL, а не молча пропускает.
 """
 import os
 import re
@@ -55,7 +54,6 @@ def patch_package():
         ok = True
     report("gradle.properties APP_PACKAGE", ok, True, f"-> {APP_PACKAGE}")
 
-    # у debug-сборки Telegram есть суффикс .beta -> убираем, чтобы пакет был ровно org.fluxgram.product
     bg = f"{TG}/TMessagesProj_App/build.gradle"
     if os.path.exists(bg):
         txt = read(bg)
@@ -107,8 +105,8 @@ def patch_connections_manager():
     patched = []
 
     def repl(m):
-        params = m.group("rest").count(",") + 2  # + первый параметр TLObject
-        if params < 6:  # короткие перегрузки только делегируют в полную
+        params = m.group("rest").count(",") + 2
+        if params < 6:
             return m.group(0)
         ret = " 0" if m.group("ret") == "int" else ""
         patched.append(m.group("name"))
@@ -151,7 +149,6 @@ MENU_ID = 9777
 
 
 def _settings_rows(txt):
-    """Способ A: строка fluxRow в списке настроек."""
     found = []
     for a in SETTINGS_ANCHORS:
         m = re.search(rf"\b{a}\s*=\s*rowCount\+\+\s*;", txt)
@@ -196,7 +193,6 @@ def _settings_rows(txt):
 
 
 def _settings_menu(txt):
-    """Способ B: пункт «FluxGram» в меню ⋮ экрана настроек."""
     m = re.search(r"(?m)^([ \t]*)(\w+)\.addSubItem\(\s*\w+\s*,", txt)
     if not m:
         return None, "B: нет addSubItem"
@@ -288,6 +284,7 @@ import androidx.core.content.ContextCompat;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.R;
+import org.telegram.messenger.UserConfig;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
@@ -296,9 +293,23 @@ public class FluxSettingsInjector {
 
     private static final String TAG_VIEW = "flux_settings_button";
 
+    private static boolean isOwnProfile(BaseFragment fragment) {
+        try {
+            java.lang.reflect.Field f = fragment.getClass().getDeclaredField("userId");
+            f.setAccessible(true);
+            long id = ((Number) f.get(fragment)).longValue();
+            return id == UserConfig.getInstance(UserConfig.selectedAccount).getClientUserId();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     public static void attach(final BaseFragment fragment, View root) {
         try {
             if (!(root instanceof FrameLayout)) {
+                return;
+            }
+            if (fragment.getClass().getSimpleName().equals("ProfileActivity") && !isOwnProfile(fragment)) {
                 return;
             }
             FrameLayout frame = (FrameLayout) root;
@@ -362,32 +373,45 @@ public class FluxSettingsInjector {
 
 
 def patch_settings_button():
-    """Хук в createView() экрана настроек: не зависит от структуры списка строк."""
+    """Хук в createView() экрана настроек (SettingsActivity и/или ProfileActivity для своего профиля)."""
     name_ = "Кнопка FluxGram в шапке настроек"
     ui = f"{JAVA}/org/telegram/ui"
-    path = f"{ui}/SettingsActivity.java"
-    if not os.path.exists(path):
-        report(name_, False, False, "(SettingsActivity.java не найден)")
-        return False
-    txt = read(path)
-    if "FluxSettingsInjector" in txt:
-        report(name_, True, False, "(уже применён)")
+    hooked = []
+    for name in ("SettingsActivity.java", "ProfileActivity.java"):
+        path = f"{ui}/{name}"
+        if not os.path.exists(path):
+            continue
+        txt = read(path)
+        if "FluxSettingsInjector" in txt:
+            hooked.append(name)
+            continue
+        m = re.search(r"public\s+View\s+createView\s*\(\s*Context\s+(\w+)\s*\)\s*\{", txt)
+        if not m:
+            continue
+        ctx = m.group(1)
+        new = (f"public View createView(Context {ctx}) {{\n"
+               f"        View fluxRoot = createViewFluxOrig({ctx});\n"
+               f"        FluxSettingsInjector.attach(this, fluxRoot);\n"
+               f"        return fluxRoot;\n"
+               f"    }}\n\n"
+               f"    private View createViewFluxOrig(Context {ctx}) {{")
+        write(path, txt[:m.start()] + new + txt[m.end():])
+        hooked.append(name)
+    # диагностика: какие файлы рисуют экран настроек
+    for root, _, files in os.walk(ui):
+        for fn in files:
+            if fn.endswith(".java"):
+                try:
+                    if "PowerUsage" in read(os.path.join(root, fn)):
+                        print(f"        [diag] 'PowerUsage' встречается в {os.path.relpath(os.path.join(root, fn), ui)}")
+                except Exception:
+                    pass
+    if hooked:
+        write(f"{ui}/FluxSettingsInjector.java", INJECTOR_JAVA)
+        report(name_, True, False, f"(хук createView: {', '.join(hooked)})")
         return True
-    m = re.search(r"public\s+View\s+createView\s*\(\s*Context\s+(\w+)\s*\)\s*\{", txt)
-    if not m:
-        report(name_, False, False, "(createView не найден в SettingsActivity.java)")
-        return False
-    ctx = m.group(1)
-    new = (f"public View createView(Context {ctx}) {{\n"
-           f"        View fluxRoot = createViewFluxOrig({ctx});\n"
-           f"        FluxSettingsInjector.attach(this, fluxRoot);\n"
-           f"        return fluxRoot;\n"
-           f"    }}\n\n"
-           f"    private View createViewFluxOrig(Context {ctx}) {{")
-    write(path, txt[:m.start()] + new + txt[m.end():])
-    write(f"{ui}/FluxSettingsInjector.java", INJECTOR_JAVA)
-    report(name_, True, False, "(SettingsActivity.java: хук в createView)")
-    return True
+    report(name_, False, False, "(createView не найден ни в SettingsActivity, ни в ProfileActivity)")
+    return False
 
 
 # ----------------------------------------------------------------------------- 5. language pack rename
